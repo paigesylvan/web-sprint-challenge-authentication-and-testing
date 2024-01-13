@@ -1,27 +1,63 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../secrets');
+const User = require('../auth/auth-model')
 
-const { JWT_SECRET } = require("../secrets/index.js");
+// AUTHENTICATION
+const restrict = (req, res, next) => {
+  // jwt.verify(req.headers.authorization, JWT_SECRET, (err, decodedToken) => {
+  //   if(err) {
+  //     res.status(401).json({ message: 'user must be logged in' });
+  //     return;
+  //   }
 
-module.exports = (req, res, next) => {
-  const token = req.headers.authorization;
+  //   req.jwt = decodedToken;
+  //   next();
+  // });
+  const token = req.headers.authorization
   if (!token) {
-    return next({ statjus: 401, message: "token required" });
-  } else {
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-      if (err) {
-        return next({ status: 401, message: "token invalid" });
-      } else {
-        req.decodedJwt = decoded;
-        next();
-      }
-    });
+    return next({ status: 401, message: 'Token required' })
   }
+  jwt.verify(token, JWT_SECRET, (err, decodedToken) => {
+    if (err) {
+      next({ status: 401, message: 'Token invalid' })
+    } else {
+      req.decodedToken = decodedToken
+      next()
+    }
+  })
+}
+async function checkUsernameExists  (req, res, next)  {
+  try {
+    const [user] = await User.findBy({ username: req.body.username })
+    if (user) {
+      next({ status: 401, message: 'username taken' })
+    }
+    else {
+      req.user = user
+      next()
+    }
+  } catch (err) {
+    next(err)
+  }
+}
 
-  /*
-    * IMPLEMENT
-
-    - On valid token in the Authorization header, call next.
-    - On missing token in the Authorization header, the response body should include a string exactly as follows: "token required".
-    - On invalid or expired token in the Authorization header, the response body should include a string exactly as follows: "token invalid".
-  */
-};
+const validateUserName = (req, res, next) => {
+  let trimmedUsername = ''
+  let trimmedPassword = ''
+  if(req.body.username){
+    trimmedUsername = req.body.username.trim()
+  }
+  if(req.body.password){
+    trimmedPassword = req.body.password.trim()
+  }
+  if ( !trimmedUsername || !trimmedPassword ) {
+    res.status(422).json({message: "username and password required"})
+  }else {
+    next()
+  }
+}
+module.exports = {
+  restrict,
+  checkUsernameExists,
+  validateUserName
+}

@@ -1,9 +1,9 @@
-const request = require("supertest");
-const server = require("./server.js");
-const db = require("../data/dbConfig.js");
+const db = require('../data/dbConfig');
+const Users = require('./auth/auth-model')
 
-test("sanity", () => {
-  expect(true).toBe(true);
+
+test('is NODE_ENV set correctly', () => {
+  expect(process.env.NODE_ENV).toBe('testing');
 });
 
 beforeAll(async () => {
@@ -11,87 +11,41 @@ beforeAll(async () => {
   await db.migrate.latest();
 });
 
+afterAll(async () => {
+  await db.destroy();
+});
+
 beforeEach(async () => {
+  await db('users').truncate();
   await db.seed.run();
 });
 
 // Write your tests here
+test('sanity', () => {
+  expect(true).toBe(true)
+})
 
-//// A minimum of 2 tests per API endpoint ////
+const request = require('supertest');
+const server = require('./server');
 
-describe("[GET] /api/jokes", () => {
-  let token;
-  beforeAll(async () => {
-    await request(server)
-      .post("/api/auth/register")
-      .send({ username: "foo", password: "1234" });
-
-    const loginRes = await request(server)
-      .post("/api/auth/login")
-      .send({ username: "foo", password: "1234" });
-
-    token = loginRes.body.token;
-  });
-
-  test("(1) returns a 200 OK status code", async () => {
-    const res = await request(server)
-      .get("/api/jokes")
-      .set("Authorization", token);
-
-    expect(res.status).toBe(200);
-  });
-
-  test("(2) returns a JSON object", async () => {
-    const res = await request(server)
-      .get("/api/jokes")
-      .set("Authorization", token);
-
-    expect(res.type).toMatch(/json/i);
-  });
-});
-
-describe("[POST] /api/auth/register", () => {
-  test("(3) returns a 201 OK status code", () => {
-    return request(server)
-      .post("/api/auth/register")
-      .send({ username: "foo", password: "1234" })
-      .then((res) => {
-        expect(res.status).toBe(201);
-      });
-  });
-  test("(4) returns a JSON object", () => {
-    return request(server)
-      .post("/api/auth/register")
-      .send({ username: "foo", password: "1234" })
-      .then((res) => {
-        expect(res.type).toMatch(/json/i);
-      });
-  });
-});
-
-describe("[POST] /api/auth/login", () => {
-  test("(5) returns a 200 OK status code", async () => {
-    await request(server)
-      .post("/api/auth/register")
-      .send({ username: "foo", password: "1234" });
-
-    return await request(server)
-      .post("/api/auth/login")
-      .send({ username: "foo", password: "1234" })
-      .then((res) => {
-        expect(res.status).toBe(200);
-      });
-  });
-  test("(6) Welcome, ${username}", async () => {
-    await request(server)
-      .post("/api/auth/register")
-      .send({ username: "foo", password: "1234" });
-
-    return await request(server)
-      .post("/api/auth/login")
-      .send({ username: "foo", password: "1234" })
-      .then((res) => {
-        expect(res.body.message).toBe("Welcome, foo");
-      });
-  });
-});
+describe('HTTP endpoints', () =>{
+  test('POST /auth/register', async () => {
+    let result = await request(server).post('/api/auth/register').send({ username: 'chad', })
+    expect(result.body).toMatchObject({ message: 'username and password required'})
+  })
+  test('POST /auth/register', async () => {
+    let result = await request(server).post('/api/auth/register').send({ username: 'chad', password: 'something' })
+    console.log(result.body.password)
+    
+    expect(result.body).toEqual({ id: 2, password: result.body.password, username: 'chad', })
+    expect(result.status).toBe(201)
+  })
+  test('POST /auth/login', async () => {
+    let result = await request(server).post('/api/auth/login').send({ username: 'chad', })
+    expect(result.body).toMatchObject({ message: 'username and password required'})
+  })
+  test('POST /auth/login', async () => {
+    let result = await request(server).post('/api/auth/login').send({ username: 'sam', password: 'newpassword' })
+    expect(result.body).toMatchObject({ message: 'Invalid Credentials'})
+  })
+})
